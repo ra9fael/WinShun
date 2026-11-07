@@ -336,7 +336,7 @@ C++ SDK 的 `initialized()` 在回答完 `initialize` 后调一次：`eager` 插
   "copy": "1234",                    // Ctrl+C 复制什么；没有就 title
   "preview": {"text": "…"},          // 悬停提示
   "actions": [{"id": "kill", "title": "结束", "key": "Enter"}],   // 覆盖命令级的
-  "valid": true,                     // false：Enter 无效（提示行）
+  "valid": true,                     // false：默认动作（打开/搜索/填入）无效（提示行）；写了 actions 的照常列出、照常执行（动作自己解释为什么做不了，如 ra9fael.qr 的"读不到密码"）
   "details": true,                   // 不是文件的行：内容详情和预览要看它时，Win顺 发 details 来问（只对常驻插件；见“内容详情与预览”）
   "data": {"pid": 1234}              // 不透明，随 action 原样回来；AI 看不到它
 }
@@ -471,7 +471,7 @@ wsbench --mcp-host --plugins D:\plugins                                 # 把插
 - **找不到 Python，或用 uv 装的 Python 一跑就"崩溃"。** Win顺 起的是 `python.exe` 本身。先看注册表里的登记（PEP 514，`HKCU/HKLM\Software\Python\<厂商>\<版本>\InstallPath`）：python.org 的 `PythonCore` 在前，uv 的 `Astral`、Anaconda 的等在后，各自挑最新的；再看 PATH 上的 `python.exe`（跳过 `WindowsApps` 里 Store 的转接程序，接着往后找）。插件的作业只许一个进程，凡是"自己再起一个 python.exe"的启动器都不能直接用，Win顺 替它们起真的那个：`py.exe` 不用；虚拟环境（venv、uv venv）的 `Scripts\python.exe` 换成它 `pyvenv.cfg` 里 `home` 下的 `python.exe`，并像启动器那样设 `__PYVENV_LAUNCHER__`，`sys.prefix` 和 site-packages 仍是这个虚拟环境的；uv 的 bin 文件夹里的 `python.exe`（`uv python install --default` 放到 PATH 上的那个）换成它指向的解释器。指向的解释器不在了（比如 uv 卸掉了那个版本），卡片上写出是哪个文件、为什么；装一个 python.org 的，或者 `uv python install` 重装一下就行，不用重启 Win顺（没找到时几秒后会再找）。
 - **超时 / 没有响应。** 一次查询的预算是 `timeoutMs`（常驻 1500、一次性 3000，最大 10000）；慢的工作先发 `query/partial` 或 `winshun/progress`，大头放后台线程。起进程本身约 15 ms（Defender 的开销），Python 几十毫秒，PowerShell 几百毫秒——所以 PowerShell 用常驻。
 - **常驻插件 print 了没反应。** 管道上 stdout 默认是块缓冲：每行后 flush（SDK 都做了；Python 还加了 `-u`）。
-- **Enter 什么都不做。** 行有 `"valid": false`，或者命令没有 `actions` 而插件的 `action` 没回。有 `open` 的行由 Win顺 自己打开，不发 `action`。
+- **Enter 什么都不做。** 行有 `"valid": false` 且没写 `actions`（提示行本就没有默认动作），或者命令没有 `actions` 而插件的 `action` 没回。有 `open` 的行由 Win顺 自己打开，不发 `action`。
 - **想写文件。** 写 `WS_DATA_DIR`（`<id>.data`，卸载时问用户要不要一起删）；`strict` 沙箱的插件只能写那里；它的 `TEMP`／`TMP` 指向 `<id>.data\tmp`（0.21 起；用户自己的临时文件夹低完整性写不了，SQLite 这类要临时文件的库会报 “unable to open database file”）。
 - **图标不显示。** 只认 PNG / JPG / ICO，路径要在插件文件夹里；SVG 不支持。
 - **关键字被占。** 和设置里"网页搜索"的关键字或别的插件撞了，用户设的赢，卡片上写明；改一个或让用户改。

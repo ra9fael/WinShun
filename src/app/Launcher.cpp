@@ -3137,7 +3137,10 @@ void Launcher::refreshKeyHints()
         // Without a row, a nonblank query can still offer scope switching.
     } else if (r->isPlugin()) {
         const PluginRow& p = *r->plugin;
-        if (p.valid) {
+        // The hints name the actions, an invalid row's included: they run
+        // there too and say why when they still cannot. Only a valid row
+        // without named actions has an implicit default to hint at.
+        if (!p.actions.isEmpty() || p.valid) {
             if (!p.actions.isEmpty()) {
                 enter = p.actions[0].title;
                 if (p.actions.size() > 1) {
@@ -5294,9 +5297,12 @@ QVariantList Launcher::menuItems(int row) const
     if (r->isPlugin()) {
         // Its actions as the plugin named them (Enter, Ctrl+Enter, Shift+Enter
         // in that order), else what its default does; then copying its text.
+        // The actions stay listed on an invalid row: one re-reads what the
+        // query could not and says why (ra9fael.qr's hidden key); only the
+        // fallback open/search/setQuery needs a valid row.
         const PluginRow& p = *r->plugin;
         static constexpr QStringView kKeys[] {u"Enter", u"Ctrl+Enter", u"Shift+Enter"};
-        if (p.valid) {
+        if (!p.actions.isEmpty()) {
             for (int i = 0; i < p.actions.size(); ++i) {
                 const QString key = !p.actions[i].key.isEmpty() ? p.actions[i].key
                     : i < 3                                     ? kKeys[i].toString()
@@ -5304,13 +5310,13 @@ QVariantList Launcher::menuItems(int row) const
                 items.append(entry(static_cast<Action>(PluginAction + i), p.actions[i].title, key,
                     i == 0 ? u"\uE8A7"_s : u"\uE768"_s));
             }
-            if (p.actions.isEmpty()) {
-                const QString text = p.openKind == PluginRow::OpenKind::Url ? tr("打开网址")
-                    : !p.searchQuery.isEmpty()                              ? tr("搜索")
-                    : !p.setQuery.isEmpty()                                 ? tr("填入搜索框")
-                                                                            : tr("打开");
-                items.append(entry(Open, text, u"Enter"_s, u"\uE8A7"_s));
-            }
+            items.append(separator);
+        } else if (p.valid) {
+            const QString text = p.openKind == PluginRow::OpenKind::Url ? tr("打开网址")
+                : !p.searchQuery.isEmpty()                              ? tr("搜索")
+                : !p.setQuery.isEmpty()                                 ? tr("填入搜索框")
+                                                                        : tr("打开");
+            items.append(entry(Open, text, u"Enter"_s, u"\uE8A7"_s));
             items.append(separator);
         }
         items.append(entry(CopyItem, tr("复制"), u"Ctrl+C"_s, u"\uE8C8"_s));
@@ -6114,9 +6120,14 @@ void Launcher::performPlugin(const SearchResult& result, Action action)
         break;
     }
     const int index = action == Open ? 0 : action == Reveal ? 1 : action == Alternate ? 2 : action >= PluginAction ? action - PluginAction : -1;
-    if (index < 0 || !p.valid)
+    if (index < 0)
         return;
-    if (index == 0) {
+    // An invalid row keeps the actions it named: one re-reads what the query
+    // could not and says why (ra9fael.qr's hidden key). Only the implicit
+    // default — open, setQuery, search — needs a valid row.
+    if (!p.valid && index >= p.actions.size())
+        return;
+    if (index == 0 && p.valid) {
         switch (p.openKind) {
         case PluginRow::OpenKind::Path: {
             // A program with arguments or a working folder is started as
